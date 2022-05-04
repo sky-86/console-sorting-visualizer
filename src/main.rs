@@ -11,7 +11,6 @@ const VECTOR_SIZE: u16 = 80;
 enum GameMode {
     Menu,
     Playing,
-    End,
 }
 
 struct Numbers {
@@ -46,7 +45,7 @@ impl Numbers {
         }
     }
 
-    fn step(&mut self) {
+    fn selection_sort(&mut self) {
         let mut min = self.current;
         for j in self.current..self.vector.len() {
             if self.vector[j] < self.vector[min] {
@@ -58,6 +57,46 @@ impl Numbers {
         self.smallest = min;
         self.current += 1;
     }
+
+    fn bubble_sort(&mut self) {
+        let range = self.vector.len();
+        for j in 0..range - self.current - 1 {
+            if self.vector[j] > self.vector[j + 1] {
+                self.vector.swap(j, j + 1);
+            }
+        }
+        self.current += 1;
+    }
+
+    fn insertion_sort(&mut self) {
+        if self.current == 0 {
+            self.current = 1;
+        }
+
+        let key = self.vector[self.current];
+        let mut j = self.current - 1;
+
+        while self.vector[j] > key {
+            self.vector.swap(j, j + 1);
+            if j == 0 {
+                break;
+            }
+            j -= 1;
+        }
+        self.current += 1;
+    }
+
+    fn gnome_sort(&mut self) {
+        if self.current == 0 {
+            self.current += 1;
+        }
+        if self.vector[self.current] >= self.vector[self.current - 1] {
+            self.current += 1;
+        } else {
+            self.vector.swap(self.current, self.current - 1);
+            self.current -= 1;
+        }
+    }
 }
 
 // stores current state
@@ -65,6 +104,7 @@ struct State {
     frame_time: f32,
     mode: GameMode,
     numbers: Numbers,
+    algorithm: String,
 }
 
 impl State {
@@ -73,20 +113,40 @@ impl State {
             frame_time: 0.0,
             mode: GameMode::Menu,
             numbers: Numbers::new(),
+            algorithm: String::from("selection"),
         }
     }
 
     fn play(&mut self, ctx: &mut BTerm) {
         ctx.cls_bg(NAVY);
 
+        // limits framrate
         self.frame_time += ctx.frame_time_ms;
         if self.frame_time > FRAME_DURATION {
             self.frame_time = 0.0;
         }
 
+        if let Some(VirtualKeyCode::Key1) = ctx.key {
+            self.algorithm = String::from("selection");
+        } else if let Some(VirtualKeyCode::Key2) = ctx.key {
+            self.algorithm = String::from("bubble");
+        } else if let Some(VirtualKeyCode::Key3) = ctx.key {
+            self.algorithm = String::from("insert");
+        } else if let Some(VirtualKeyCode::Key4) = ctx.key {
+            self.algorithm = String::from("gnome");
+        }
+
         if let Some(VirtualKeyCode::Space) = ctx.key {
             if self.numbers.current < VECTOR_SIZE as usize {
-                self.numbers.step();
+                if self.algorithm == "selection" {
+                    self.numbers.selection_sort();
+                } else if self.algorithm == "bubble" {
+                    self.numbers.bubble_sort();
+                } else if self.algorithm == "insert" {
+                    self.numbers.insertion_sort();
+                } else if self.algorithm == "gnome" {
+                    self.numbers.gnome_sort();
+                }
             }
         }
 
@@ -94,6 +154,7 @@ impl State {
             self.restart();
         }
 
+        ctx.print(0, SCREEN_HEIGHT - 2, &self.algorithm);
         self.numbers.render(ctx);
     }
 
@@ -118,28 +179,12 @@ impl State {
             }
         }
     }
-
-    fn done(&mut self, ctx: &mut BTerm) {
-        ctx.cls();
-        ctx.print_centered(8, "(P) Play Again");
-        ctx.print_centered(9, "(Q) Quit Game");
-
-        if let Some(key) = ctx.key {
-            match key {
-                VirtualKeyCode::P => self.restart(),
-                VirtualKeyCode::Q => ctx.quitting = true,
-                // do nothing if they press anything else
-                _ => {}
-            }
-        }
-    }
 }
 
 impl GameState for State {
     fn tick(&mut self, ctx: &mut BTerm) {
         match self.mode {
             GameMode::Menu => self.main_menu(ctx),
-            GameMode::End => self.done(ctx),
             GameMode::Playing => self.play(ctx),
         }
     }
