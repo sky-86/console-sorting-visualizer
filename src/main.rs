@@ -7,27 +7,25 @@ const SCREEN_HEIGHT: i32 = 80;
 const FRAME_DURATION: f32 = 75.0;
 const VECTOR_SIZE: u16 = 80;
 
-// types of game states
-enum GameMode {
-    Menu,
-    Playing,
-}
-
-struct Numbers {
+struct Data {
     vector: Vec<u16>,
     current: usize,
     smallest: usize,
+    i: usize,
+    j: usize,
 }
 
-impl Numbers {
+impl Data {
     fn new() -> Self {
         let mut vec: Vec<u16> = (1..=VECTOR_SIZE).collect();
         vec.shuffle(&mut thread_rng());
 
-        Numbers {
+        Data {
             vector: vec,
             current: 0,
             smallest: 0,
+            i: 0,
+            j: 0,
         }
     }
 
@@ -42,6 +40,16 @@ impl Numbers {
                     ctx.set(i, y, YELLOW, BLACK, to_cp437('#'));
                 }
             }
+        }
+    }
+
+    fn sort(&mut self, algo: &str) {
+        match algo {
+            "selection" => self.selection_sort(),
+            "bubble" => self.bubble_sort(),
+            "insert" => self.insertion_sort(),
+            "gnome" => self.gnome_sort(),
+            _ => println!("Error, sorting algo"),
         }
     }
 
@@ -102,8 +110,7 @@ impl Numbers {
 // stores current state
 struct State {
     frame_time: f32,
-    mode: GameMode,
-    numbers: Numbers,
+    data: Data,
     algorithm: String,
 }
 
@@ -111,8 +118,7 @@ impl State {
     fn new() -> Self {
         State {
             frame_time: 0.0,
-            mode: GameMode::Menu,
-            numbers: Numbers::new(),
+            data: Data::new(),
             algorithm: String::from("selection"),
         }
     }
@@ -137,16 +143,8 @@ impl State {
         }
 
         if let Some(VirtualKeyCode::Space) = ctx.key {
-            if self.numbers.current < VECTOR_SIZE as usize {
-                if self.algorithm == "selection" {
-                    self.numbers.selection_sort();
-                } else if self.algorithm == "bubble" {
-                    self.numbers.bubble_sort();
-                } else if self.algorithm == "insert" {
-                    self.numbers.insertion_sort();
-                } else if self.algorithm == "gnome" {
-                    self.numbers.gnome_sort();
-                }
+            if self.data.current < VECTOR_SIZE as usize {
+                self.data.sort(&self.algorithm);
             }
         }
 
@@ -155,38 +153,18 @@ impl State {
         }
 
         ctx.print(0, SCREEN_HEIGHT - 2, &self.algorithm);
-        self.numbers.render(ctx);
+        self.data.render(ctx);
     }
 
     fn restart(&mut self) {
         self.frame_time = 0.0;
-        self.mode = GameMode::Playing;
-        self.numbers = Numbers::new();
-    }
-
-    fn main_menu(&mut self, ctx: &mut BTerm) {
-        ctx.cls();
-        ctx.print_centered(5, "Sorting Visualizer");
-        ctx.print_centered(8, "(S) Start");
-        ctx.print_centered(9, "(Q) Quit");
-
-        if let Some(key) = ctx.key {
-            match key {
-                VirtualKeyCode::S => self.restart(),
-                VirtualKeyCode::Q => ctx.quitting = true,
-                // do nothing if they press anything else
-                _ => {}
-            }
-        }
+        self.data = Data::new();
     }
 }
 
 impl GameState for State {
     fn tick(&mut self, ctx: &mut BTerm) {
-        match self.mode {
-            GameMode::Menu => self.main_menu(ctx),
-            GameMode::Playing => self.play(ctx),
-        }
+        self.play(ctx);
     }
 }
 
